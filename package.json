@@ -1,0 +1,9 @@
+{
+	"name": "AI_Chess",
+	"version": "0.0.1",
+	"description": "Real time chess competition",
+	"dependencies": {
+		"socket.io": "latest"
+	},
+	"author": "Tayllan Búrigo"
+}
