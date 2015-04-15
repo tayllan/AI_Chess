@@ -109,10 +109,11 @@ socket.on('connection', function(client) {
 	var client_url = engine_url.split('.');
 	var aux_length = client_url.length;
 
-	if (aux_length < 2 || client_url[aux_length - 1] !== 'io' && client_url[aux_length - 2] !== 'github') {
+	if (aux_length < 2 || (client_url[aux_length - 1] !== 'io' && client_url[aux_length - 2].split('/')[0] !== 'github')) {
 
 		// TODO: uncomment the code below when in 'production' to disconnect 'illegal' client
 		//client.disconnect();
+		console.log('ILLEGAL URL, DISCONNECT!');
 	}
 
 	players[client.id] = client;

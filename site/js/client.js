@@ -19,10 +19,19 @@ function _(engine) {
 		alert_ilegal_move: function() {
 			alert('That\'s a ilegal move!');
 		},
+		alert_challenge: function(username) {
+			return confirm(username + ' is challenging your to a match! IT IS ON!');
+		},
+		alert_challenge_accepted: function(username) {
+			alert('IT IS ON');
+		},
+		alert_challenge_refused: function(username) {
+			alert(username + ' has refused to duel you!');
+		},
 		render_board: function(fen_string) {
 			board = new ChessBoard('board',	fen_string);
 		},
-		render_players_list: function(players_list) {
+		render_players_list: function(players_list, event_listener_fn) {
 			element_players_list.innerHTML = '';
 
 			players_list.forEach(function(element, index, array) {
@@ -31,6 +40,7 @@ function _(engine) {
 				if (element.challengeable === true) {
 					child = document.createElement('a');
 					child.href = element.id;
+					child.addEventListener('click', event_listener_fn);
 					element_players_list.appendChild(document.createElement('br'));
 				}
 				else {
@@ -54,24 +64,20 @@ function _(engine) {
 
 	socket.on('/players', function(data) {
 		players_list = data.players;
-		_html.render_players_list(players_list);
+		_html.render_players_list(players_list, function(event) {
+			event.preventDefault();
 
-		element_players_list.addEventListener('click', function(event) {
-			if (event.target.tagName.toLowerCase() === 'a') {
-				event.preventDefault();
+			var aux = event.target.href.split('/');
+			var challenged_id = aux[aux.length - 1];
 
-				var aux = event.target.href.split('/');
-				var challenged_id = aux[aux.length - 1];
-
-				if (challenged_id === my_id) {
-					alert('You can\'t challenge yourself!');
-				}
-				else {
-					socket.emit('/challenge', {id: challenged_id});
-				}
-
-				return false;
+			if (challenged_id === my_id) {
+				alert('You can\'t challenge yourself!');
 			}
+			else {
+				socket.emit('/challenge', {id: challenged_id});
+			}
+
+			return false;
 		});
 	});
 
@@ -80,9 +86,10 @@ function _(engine) {
 
 		players_list.forEach(function(element, index, array) {
 			if (element.id === challenger_id) {
-				var c = confirm(element.username + ' is challenging your to a match! IT IS ON!');
+				var c = _html.alert_challenge(element.username);
 
 				if (c) {
+					board_helper = new Chess();
 					socket.emit('/challenged', {
 						accept: true,
 						challenger: challenger_id,
@@ -102,11 +109,11 @@ function _(engine) {
 
 	socket.on('/challenge', function(data) {
 		if (data.accept === false) {
-			alert(username);
-			alert(data.username + ' has refused to duel you!');
+			_html.alert_challenge_refused(data.username);
 		}
 		else {
-			alert('IT IS ON');
+			board_helper = new Chess();
+			_html.alert_challenge_accepted(data.username);
 		}
 	});
 
@@ -114,16 +121,22 @@ function _(engine) {
 		_html.render_board(data.board);
 
 		if (data.ilegal_move) {
+			console.log(board_helper.fen());
+			console.log(data);
 			_html.alert_ilegal_move();
+			engine.new_game();
 		}
 		else if (data.in_checkmate) {
 			_html.alert_loss();
+			engine.new_game();
 		}
 		else if (data.in_draw) {
 			_html.alert_draw();
+			engine.new_game();
 		}
 		else if (data.in_victory) {
 			_html.alert_winning();
+			engine.new_game();
 		}
 		else {
 			board_helper.move(data.last_move);
