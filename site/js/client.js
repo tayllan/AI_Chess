@@ -89,7 +89,6 @@ function _(engine) {
 				var c = _html.alert_challenge(element.username);
 
 				if (c) {
-					board_helper = new Chess();
 					socket.emit('/challenged', {
 						accept: true,
 						challenger: challenger_id,
@@ -112,7 +111,6 @@ function _(engine) {
 			_html.alert_challenge_refused(data.username);
 		}
 		else {
-			board_helper = new Chess();
 			_html.alert_challenge_accepted(data.username);
 		}
 	});
@@ -121,22 +119,16 @@ function _(engine) {
 		_html.render_board(data.board);
 
 		if (data.ilegal_move) {
-			console.log(board_helper.fen());
-			console.log(data);
 			_html.alert_ilegal_move();
-			engine.new_game();
 		}
 		else if (data.in_checkmate) {
 			_html.alert_loss();
-			engine.new_game();
 		}
 		else if (data.in_draw) {
 			_html.alert_draw();
-			engine.new_game();
 		}
 		else if (data.in_victory) {
 			_html.alert_winning();
-			engine.new_game();
 		}
 		else {
 			board_helper.move(data.last_move);
