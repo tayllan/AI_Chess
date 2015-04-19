@@ -7,7 +7,35 @@ var broadcast = function(rest, message) {
 var chess = require('./chess.min.js');
 var rooms = {};
 
-// TODO: maybe put this on a separate file (auxiliary functions and such)
+// TODO: maybe put this on a separate file (helper functions and such)
+var Room = function(p1_id, p2_id, room_id) {
+	this.p1_id = p1_id;
+	this.p2_id = p2_id;
+	this.id = room_id;
+	this.finished_match = false;
+	this.remove_player = function(p_id) {
+		if (this.p1_id && this.p1_id.id === p_id) {
+			delete this.p1_id;
+		}
+		else if (this.p2_id && this.p2_id.id === p_id) {
+			delete this.p2_id;
+		}
+	};
+	this.are_there_players = function() {
+		return (this.p1_id || this.p2_id) ? true : false;
+	};
+	this.get_other_player_id = function(p_id) {
+		if (this.p1_id === p_id && this.p2_id) {
+			return p2_id;
+		}
+		else if (this.p2_id === p_id && this.p1_id) {
+			return p1_id;
+		}
+		else {
+			return null;
+		}
+	};
+};
 var available_characters = [
 	'0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
 	'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j',
@@ -16,7 +44,7 @@ var available_characters = [
 	'%', '"&', '*', '(', ')'
 ];
 var generate_random_id = function(size) {
-	size = size || 50;
+	size = size || 30;
 	var random_id = '';
 
 	for (; size--; ) {
@@ -36,7 +64,7 @@ var broadcast_players = function() {
 			id: id,
 			username: players[id].username,
 			engine_url: players[id].engine_url,
-			challengeable: players[id].challengeable,
+			challengeable: (players[id].room_id) ? false : true,
 			wins: players[id].wins,
 			losses: players[id].losses,
 			draws: players[id].draws,
@@ -51,18 +79,12 @@ var play_match = function(p1, p2) {
 	while (room_id in rooms) {
 		room_id = generate_random_id();
 	}
-	p1.challengeable = false;
 	p1.room_id = room_id;
-	p2.challengeable = false;
 	p2.room_id = room_id;
 	broadcast_players();
 	var board = chess.Chess();
 
-	rooms[room_id] = {
-		player1: p1,
-		player2: p2,
-		finished_match: false,
-	};
+	rooms[room_id] = new Room(p1.id, p2.id, room_id);
 
 	// TODO: initially only the player suppose to make a move receives the board
 	p1.emit('/play', {
@@ -142,24 +164,20 @@ socket.on('connection', function(client) {
 
 	players[client.id] = client;
 	players[client.id].engine_url = engine_url;
-	players[client.id].challengeable = true;
 	players[client.id].wins = 0;
 	players[client.id].losses = 0;
 	players[client.id].draws = 0;
-	players[client.id].room_id = '';
 
-	// the client has done viewing the match he was just playing, he's now available to any other challenge
+	// the client has done viewing the match he was just playing, he's now available to another challenge
 	client.on('/available', function(data) {
 		var temp_room_id = players[client.id].room_id;
 
-		if (rooms[temp_room_id].player1.id === client.id) {
-			delete rooms[temp_room_id].player1;
+		rooms[temp_room_id].remove_player(client.id);
+		if (rooms[temp_room_id].are_there_players()) {
+			delete rooms[temp_room_id];
 		}
-		else {
-			delete rooms[temp_room_id].player2;
-		}
-		players[client.id].challengeable = true;
-		players[client.id].room_id = '';
+
+		delete players[client.id].room_id;
 		broadcast_players();
 	});
 
@@ -203,15 +221,22 @@ socket.on('connection', function(client) {
 	});
 
 	client.on('disconnect', function() {
-		if (players[client.id] && !rooms[players[client.id]].finished_match) {
+		var c_i = client.id;
 
-			// TODO: fix this bad workaround (probably using rooms or similar)
-			players[players[client.id].opponent].challengeable = true;
-			players[players[client.id].opponent].wins += 1;
+		// if the disconnecting player is still on a match, the other player automatically wins
+		console.log(rooms);
+		console.log(players[c_i].room_id);
+		if (players[c_i].room_id && !rooms[players[c_i].room_id].finished_match) {
+			var other_player_id = rooms[players[c_i].room_id].get_other_player_id(c_i);
+			
+			players[other_player_id].wins += 1;
+			delete players[other_player_id].room_id;
+			delete rooms[players[c_i].room_id];
+			players[other_player_id].emit('/disconnection', {username: players[c_i].username});
 		}
 
 		// Client has disconnected, remove him for the list of players and update everyone else's list
-		delete players[client.id];
+		delete players[c_i];
 		broadcast_players();
 	});
 });

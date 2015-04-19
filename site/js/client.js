@@ -9,6 +9,9 @@ function _(engine) {
 		get_username: function() {
 			return prompt('Type your username: ');
 		},
+		alert_disconnection: function(username) {
+			alert(username + ' quit or got disconnected.');
+		},
 		alert_draw: function() {
 			alert('It\'s a draw!');
 		},
@@ -140,6 +143,11 @@ function _(engine) {
 			}, parseInt(element_board_speed.value, 10) * 10 + 1);
 			_html.alert_challenge_accepted(data.username);
 		}
+	});
+
+	socket.on('/disconnection', function(data) {
+		_html.alert_disconnection(data.username);
+		_html.alert_winning();
 	});
 
 	socket.on('/play', function(data) {
