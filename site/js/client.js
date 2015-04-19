@@ -83,6 +83,9 @@ function _(engine) {
 		});
 	});
 
+	var has_game_ended_on_server = false;
+	var alert_function = null;
+
 	socket.on('/challenged', function(data) {
 		var challenger_id = data.challenger;
 
@@ -91,6 +94,17 @@ function _(engine) {
 				var c = _html.alert_challenge(element.username);
 
 				if (c) {
+					var move_index = 0;
+					var board_interval = setInterval(function() {
+						if (move_index < moves_stack.length) {
+							_html.render_board(moves_stack[move_index++]);
+						}
+						else if (has_game_ended_on_server) {
+							clearInterval(board_interval);
+							alert_function();
+							socket.emit('/available', {});
+						}
+					}, parseInt(element_board_speed.value, 10) * 10 + 1);
 					socket.emit('/challenged', {
 						accept: true,
 						challenger: challenger_id,
@@ -113,6 +127,17 @@ function _(engine) {
 			_html.alert_challenge_refused(data.username);
 		}
 		else {
+			var move_index = 0;
+			var board_interval = setInterval(function() {
+				if (move_index < moves_stack.length) {
+					_html.render_board(moves_stack[move_index++]);
+				}
+				else if (has_game_ended_on_server) {
+					clearInterval(board_interval);
+					alert_function();
+					socket.emit('/available', {});
+				}
+			}, parseInt(element_board_speed.value, 10) * 10 + 1);
 			_html.alert_challenge_accepted(data.username);
 		}
 	});
@@ -125,13 +150,16 @@ function _(engine) {
 			_html.alert_ilegal_move();
 		}
 		else if (data.in_checkmate) {
-			_html.alert_loss();
+			alert_function = _html.alert_loss;
+			has_game_ended_on_server = true;
 		}
 		else if (data.in_draw) {
-			_html.alert_draw();
+			alert_function = _html.alert_draw;
+			has_game_ended_on_server = true;
 		}
 		else if (data.in_victory) {
-			_html.alert_winning();
+			alert_function = _html.alert_winning;
+			has_game_ended_on_server = true;
 		}
 		else {
 			board_helper.move(data.last_move);
@@ -143,8 +171,4 @@ function _(engine) {
 			socket.emit('/play', {move: move});
 		}
 	});
-
-	setInterval(function() {
-		_html.render_board(moves_stack.pop());
-	}, element_board_speed.value);
 };

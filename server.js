@@ -48,8 +48,6 @@ var play_match = function(p1, p2) {
 				if (board.in_checkmate()) {
 					p1.wins += 1;
 					p2.losses += 1;
-					p1.challengeable = true;
-					p2.challengeable = true;
 
 					p1.emit('/play', {
 						board: fen_string,
@@ -61,14 +59,10 @@ var play_match = function(p1, p2) {
 						last_move: data.move,
 						in_checkmate: true,
 					});
-
-					broadcast_players();
 				}
 				else if (board.in_draw()) {
 					p1.draws += 1;
 					p2.draws += 1;
-					p1.challengeable = true;
-					p2.challengeable = true;
 
 					p1.emit('/play', {
 						board: fen_string,
@@ -80,8 +74,6 @@ var play_match = function(p1, p2) {
 						last_move: data.move,
 						in_draw: true,
 					});
-					
-					broadcast_players();
 				}
 				else {
 					p2.emit('/play', {
@@ -122,6 +114,12 @@ socket.on('connection', function(client) {
 	players[client.id].wins = 0;
 	players[client.id].losses = 0;
 	players[client.id].draws = 0;
+
+	// the client has done viewing the match he was just playing, he's now available to any other challenge
+	client.on('/available', function(data) {
+		players[client.id].challengeable = true;
+		broadcast_players();
+	});
 
 	// receives the username of the new player and put him in the list of players
 	client.on('/username', function(data) {
