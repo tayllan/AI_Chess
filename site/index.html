@@ -7,7 +7,12 @@
 	</head>
 
 	<body>
-		<label>Speed: <input type="range" id="board-speed"></label>
+		<div>
+			<label>Speed Controls: </label>
+			<input type="number" id="board-speed" readonly="readonly" value="10">
+			<button id="plus">+</button>
+			<button id="minus">-</button>
+		</div>
 		<div id="players-list"></div>
 		<div id="board" style="width: 400px"></div>
 	</body>

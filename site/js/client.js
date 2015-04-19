@@ -4,6 +4,20 @@ var moves_stack = [];
 var board = new ChessBoard('board', 'start');
 var board_helper = new Chess();
 
+document.getElementById('plus').addEventListener('click', function(event) {
+	var aux = parseInt(element_board_speed.value, 10);
+	if (aux < 20) {
+		element_board_speed.value = aux + 1;
+	}
+});
+
+document.getElementById('minus').addEventListener('click', function(event) {
+	var aux = parseInt(element_board_speed.value, 10);
+	if (aux > 1) {
+		element_board_speed.value = aux - 1;
+	}
+});
+
 function _(engine) {
 	var _html = {
 		get_username: function() {
@@ -88,6 +102,25 @@ function _(engine) {
 
 	var has_game_ended_on_server = false;
 	var alert_function = null;
+
+	var counter = parseInt(element_board_speed.value, 10) * 100;
+	var aux_fn = function() {
+		clearInterval(interval);
+		counter = parseInt(element_board_speed.value, 10) * 100;
+
+		if (has_game_ended_on_server) {
+			alert_function();
+			socket.emit('/available', {});
+		}
+		else {
+			if (move_index < moves_stack.length) {
+				_html.render_board(moves_stack[move_index++]);
+			}
+			interval = setInterval(aux_fn, counter);
+		}
+	};
+	var interval = setInterval(aux_fn, counter);
+
 
 	socket.on('/challenged', function(data) {
 		var challenger_id = data.challenger;
