@@ -5,6 +5,26 @@ var broadcast = function(rest, message) {
 	socket.sockets.emit(rest, message);
 };
 var chess = require('./chess.min.js');
+var rooms = {};
+
+// TODO: maybe put this on a separate file (auxiliary functions and such)
+var available_characters = [
+	'0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+	'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j',
+	'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't',
+	'u', 'v', 'w', 'x', 'y', 'z', '!', '@', '#', '$',
+	'%', '"&', '*', '(', ')'
+];
+var generate_random_id = function(size) {
+	size = size || 50;
+	var random_id = '';
+
+	for (; size--; ) {
+		random_id += available_characters[Math.floor(Math.random() * available_characters.length)]
+	}
+	
+	return random_id;
+};
 
 // send everybody the list of players online
 var broadcast_players = function() {
@@ -27,12 +47,22 @@ var broadcast_players = function() {
 };
 
 var play_match = function(p1, p2) {
+	var room_id = generate_random_id();
+	while (room_id in rooms) {
+		room_id = generate_random_id();
+	}
 	p1.challengeable = false;
-	p1.opponent = p2.id;
+	p1.room_id = room_id;
 	p2.challengeable = false;
-	p2.opponent = p1.id;
+	p2.room_id = room_id;
 	broadcast_players();
 	var board = chess.Chess();
+
+	rooms[room_id] = {
+		player1: p1,
+		player2: p2,
+		finished_match: false,
+	};
 
 	// TODO: initially only the player suppose to make a move receives the board
 	p1.emit('/play', {
@@ -48,6 +78,7 @@ var play_match = function(p1, p2) {
 				if (board.in_checkmate()) {
 					p1.wins += 1;
 					p2.losses += 1;
+					rooms[room_id].finished_match = true;
 
 					p1.emit('/play', {
 						board: fen_string,
@@ -63,6 +94,7 @@ var play_match = function(p1, p2) {
 				else if (board.in_draw()) {
 					p1.draws += 1;
 					p2.draws += 1;
+					rooms[room_id].finished_match = true;
 
 					p1.emit('/play', {
 						board: fen_string,
@@ -114,10 +146,20 @@ socket.on('connection', function(client) {
 	players[client.id].wins = 0;
 	players[client.id].losses = 0;
 	players[client.id].draws = 0;
+	players[client.id].room_id = '';
 
 	// the client has done viewing the match he was just playing, he's now available to any other challenge
 	client.on('/available', function(data) {
+		var temp_room_id = players[client.id].room_id;
+
+		if (rooms[temp_room_id].player1.id === client.id) {
+			delete rooms[temp_room_id].player1;
+		}
+		else {
+			delete rooms[temp_room_id].player2;
+		}
 		players[client.id].challengeable = true;
+		players[client.id].room_id = '';
 		broadcast_players();
 	});
 
@@ -161,7 +203,7 @@ socket.on('connection', function(client) {
 	});
 
 	client.on('disconnect', function() {
-		if (players[client.id] && players[client.id].challengeable === false) {
+		if (players[client.id] && !rooms[players[client.id]].finished_match) {
 
 			// TODO: fix this bad workaround (probably using rooms or similar)
 			players[players[client.id].opponent].challengeable = true;
