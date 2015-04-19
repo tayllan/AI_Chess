@@ -1,4 +1,6 @@
 var element_players_list = document.getElementById('players-list');
+var element_board_speed = document.getElementById('board-speed');
+var moves_stack = [];
 var board = new ChessBoard('board', 'start');
 var board_helper = new Chess();
 
@@ -116,7 +118,8 @@ function _(engine) {
 	});
 
 	socket.on('/play', function(data) {
-		_html.render_board(data.board);
+		//_html.render_board(data.board);
+		moves_stack.push(data.board);
 
 		if (data.ilegal_move) {
 			_html.alert_ilegal_move();
@@ -134,9 +137,14 @@ function _(engine) {
 			board_helper.move(data.last_move);
 			var move = engine.next_move(data.last_move);
 			board_helper.move(move);
-			board.position(board_helper.fen());
+			//board.position(board_helper.fen());
+			moves_stack.push(board_helper.fen());
 
 			socket.emit('/play', {move: move});
 		}
 	});
+
+	setInterval(function() {
+		_html.render_board(moves_stack.pop());
+	}, element_board_speed.value);
 };
