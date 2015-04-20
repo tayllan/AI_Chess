@@ -7,14 +7,25 @@
 	</head>
 
 	<body>
-		<div>
-			<label>Speed Controls: </label>
-			<input type="number" id="board-speed" readonly="readonly" value="10">
-			<button id="plus">+</button>
-			<button id="minus">-</button>
+		<label>Match Controls:</label>
+		<div style="border: solid 1px;">
+			<div>
+				<label>Speed Controls: </label>
+				<input type="number" id="board-speed" readonly="readonly" value="10">
+				<button id="plus">+</button>
+				<button id="minus">-</button>
+			</div>
+			<div>
+				<label>Flow Controls: </label>
+				<button id="prev">&lt</button>
+				<button id="pause">||</button>
+				<button id="play">O</button>
+				<button id="next">&gt</button>
+			</div>
 		</div>
 		<div id="players-list"></div>
 		<div id="board" style="width: 400px"></div>
+		<button id="finish" disabled="true">Finish</button>
 	</body>
 
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/1.3.5/socket.io.min.js"></script>

@@ -1,24 +1,82 @@
-var element_players_list = document.getElementById('players-list');
-var element_board_speed = document.getElementById('board-speed');
-var moves_stack = [];
-var board = new ChessBoard('board', 'start');
-var board_helper = new Chess();
-
-document.getElementById('plus').addEventListener('click', function(event) {
-	var aux = parseInt(element_board_speed.value, 10);
-	if (aux < 20) {
-		element_board_speed.value = aux + 1;
-	}
-});
-
-document.getElementById('minus').addEventListener('click', function(event) {
-	var aux = parseInt(element_board_speed.value, 10);
-	if (aux > 1) {
-		element_board_speed.value = aux - 1;
-	}
-});
-
 function _(engine) {
+	var element_players_list = document.getElementById('players-list');
+	var element_board_speed = document.getElementById('board-speed');
+	var moves_stack = [];
+	var move_index = 0;
+	var board = new ChessBoard('board', 'start');
+	var board_helper = new Chess();
+	var btn_plus = document.getElementById('plus');
+	var btn_minus = document.getElementById('minus');
+	var btn_prev = document.getElementById('prev');
+	var btn_pause = document.getElementById('pause');
+	var btn_play = document.getElementById('play');
+	var btn_next = document.getElementById('next');
+	var btn_finish = document.getElementById('finish');
+	var has_game_ended_on_server = false;
+	var alert_function = null;
+	var control_match = function() {
+		var counter = 800 - parseInt(element_board_speed.value, 10) * 40;
+		var aux_fn = function() {
+			clearInterval(interval);
+			counter = 800 - parseInt(element_board_speed.value, 10) * 40;
+
+			if (has_game_ended_on_server && move_index === moves_stack.length) {
+				alert_function();
+				btn_finish.disabled = false;
+			}
+			else {
+				if (move_index < moves_stack.length) {
+					_html.render_board(moves_stack[move_index++]);
+				}
+				interval = setInterval(aux_fn, counter);
+			}
+		};
+		var interval = setInterval(aux_fn, counter);
+
+		btn_prev.addEventListener('click', function(event) {
+			clearInterval(interval);
+			if (move_index - 1 >= 0) {
+				console.log(moves_stack[move_index - 1]);
+				_html.render_board(moves_stack[--move_index]);
+			}
+		});
+		btn_pause.addEventListener('click', function(event) {
+			clearInterval(interval);
+		});
+		btn_play.addEventListener('click', function(event) {
+			interval = setInterval(aux_fn, counter);
+		});
+		btn_next.addEventListener('click', function(event) {
+			clearInterval(interval);
+			if (move_index + 1 < moves_stack.length) {
+				_html.render_board(moves_stack[++move_index]);
+			}
+		});
+	};
+
+
+	btn_plus.addEventListener('click', function(event) {
+		var aux = parseInt(element_board_speed.value, 10);
+		if (aux < 20) {
+			element_board_speed.value = aux + 1;
+			btn_minus.disabled = false;
+		}
+		else {
+			this.disabled = true;
+		}
+	});
+
+	btn_minus.addEventListener('click', function(event) {
+		var aux = parseInt(element_board_speed.value, 10);
+		if (aux > 1) {
+			element_board_speed.value = aux - 1;
+			btn_plus.disabled = false;
+		}
+		else {
+			this.disabled = true;
+		}
+	});
+
 	var _html = {
 		get_username: function() {
 			return prompt('Type your username: ');
@@ -100,28 +158,6 @@ function _(engine) {
 		});
 	});
 
-	var has_game_ended_on_server = false;
-	var alert_function = null;
-
-	var counter = parseInt(element_board_speed.value, 10) * 100;
-	var aux_fn = function() {
-		clearInterval(interval);
-		counter = parseInt(element_board_speed.value, 10) * 100;
-
-		if (has_game_ended_on_server) {
-			alert_function();
-			socket.emit('/available', {});
-		}
-		else {
-			if (move_index < moves_stack.length) {
-				_html.render_board(moves_stack[move_index++]);
-			}
-			interval = setInterval(aux_fn, counter);
-		}
-	};
-	var interval = setInterval(aux_fn, counter);
-
-
 	socket.on('/challenged', function(data) {
 		var challenger_id = data.challenger;
 
@@ -130,17 +166,10 @@ function _(engine) {
 				var c = _html.alert_challenge(element.username);
 
 				if (c) {
-					var move_index = 0;
-					var board_interval = setInterval(function() {
-						if (move_index < moves_stack.length) {
-							_html.render_board(moves_stack[move_index++]);
-						}
-						else if (has_game_ended_on_server) {
-							clearInterval(board_interval);
-							alert_function();
-							socket.emit('/available', {});
-						}
-					}, parseInt(element_board_speed.value, 10) * 10 + 1);
+
+					// wild fix because the 2nd player doesn't receive the initial board position from the server (it's used for replay and the prev button)
+					moves_stack[move_index++] = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR';
+					control_match();
 					socket.emit('/challenged', {
 						accept: true,
 						challenger: challenger_id,
@@ -163,17 +192,7 @@ function _(engine) {
 			_html.alert_challenge_refused(data.username);
 		}
 		else {
-			var move_index = 0;
-			var board_interval = setInterval(function() {
-				if (move_index < moves_stack.length) {
-					_html.render_board(moves_stack[move_index++]);
-				}
-				else if (has_game_ended_on_server) {
-					clearInterval(board_interval);
-					alert_function();
-					socket.emit('/available', {});
-				}
-			}, parseInt(element_board_speed.value, 10) * 10 + 1);
+			control_match();
 			_html.alert_challenge_accepted(data.username);
 		}
 	});
@@ -184,7 +203,6 @@ function _(engine) {
 	});
 
 	socket.on('/play', function(data) {
-		//_html.render_board(data.board);
 		moves_stack.push(data.board);
 
 		if (data.ilegal_move) {
@@ -206,10 +224,17 @@ function _(engine) {
 			board_helper.move(data.last_move);
 			var move = engine.next_move(data.last_move);
 			board_helper.move(move);
-			//board.position(board_helper.fen());
 			moves_stack.push(board_helper.fen());
 
 			socket.emit('/play', {move: move});
 		}
+	});
+
+	btn_finish.addEventListener('click', function(event) {
+		socket.emit('/available', {});
+		this.disabled = true;
+		moves_stack = [];
+		board = new ChessBoard('board', 'start');
+		board_helper = new Chess();
 	});
 };
